@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tarjeta de Felicitación</title>
+    <style>
+        body {
+            font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+             /* Fondo blanco */
+            background-color: #f9f9f9;
+            text-align: center;
+        }
+
+        .card {
+             /* Fondo crudo */
+            background-color: #e7e6de;
+            width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(45, 17, 147, 0.1);
+        }
+
+        .message {
+            font-size: 28px;
+            margin-bottom: 20px;
+            /* Letras en azul */
+            color: rgb(42, 42, 82);
+        }
+
+        .sender {
+            font-style: italic;
+        }
+
+        .birthday-wish {
+            font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+             /* Letras en color del logo */
+            color: #FFBD59;
+            font-size: 42px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 class="birthday-wish">¡Feliz Cumpleaños!, {nombre}</h1>
+        <img src="https://myimgnch.s3.us-east-2.amazonaws.com/imagen_cumpleanos.png" alt="Imagen Cumpleaños" width="200">
+        <div class="message">
+            <p>En este día especial, te deseamos un cumpleaños lleno de alegría, amor y felicidad.</p>
+            <p>¡Qué todos tus deseos se hagan realidad!</p>
+            <p>Con cariño,</p>
+        </div>
+        <div class="sender">
+            <p style="color: #ff914d; font-size: 28px;">Familia</p>
+            <img src="https://myimgnch.s3.us-east-2.amazonaws.com/logo_Broken_IA.png" alt="Logo BrokenIA" width="200">
+        </div>        
+    </div>
+</body>
+</html>
