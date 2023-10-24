@@ -31,49 +31,60 @@
 
 # %%
 %pip install pandas
+%pip install reportlab
+%pip install fpdf
 
 # %%
+import pandas as pd
 import os
 import numpy as np
-import pandas as pd
 import smtplib
 import openpyxl
 import csv
 import random
+import datetime
 
 # Import the email modules we'll need
 from email.message import EmailMessage
 # Para la lista de cumpleaños
 from datetime import datetime, timedelta
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from fpdf import FPDF
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Image
 
 import warnings
 warnings.filterwarnings('ignore')
 
 # %% [markdown]
-# ## Etapa 2: generar una lista de cumpleaños y completar la CSV
+# ## Etapa 2: generar una lista de ingresos y completar la CSV
 
 # %%
-# Crear una lista de 500 fechas de nacimiento aleatorias entre 1950-01-01 y 2000-12-31
-start_date = datetime(1950, 1, 1)
-end_date = datetime(2006, 12, 31)
+# Crear una lista de 500 fechas de ingreso aleatorias entre 1998-05-12 y hoy
+start_date = datetime(1998, 5, 12)
+end_date = datetime.now()
 
-cumpleanos = [start_date + timedelta(days=random.randint(0, (end_date - start_date).days)) for _ in range(500)]
+ingreso = [start_date + timedelta(days=random.randint(0, (end_date - start_date).days)) for _ in range(500)]
 
 # %%
-# Crear un DataFrame de pandas con las fechas de nacimiento
-fecha_nacimiento = pd.DataFrame({'fecha_nacimiento': cumpleanos})
-fecha_nacimiento.sample(10)
+# Crear un DataFrame de pandas con las fechas de ingreso
+fecha_ingreso = pd.DataFrame({'fecha_ingreso': ingreso})
+fecha_ingreso.sample(10)
 
 # %%
 # Leer el archivo CSV existente
-base_de_datos = pd.read_csv('BD_BrokenIA.csv')
+base_de_datos = pd.read_csv('BD_BrokenIA_cumpleanos.csv')
 
-# Agregar la columna de fechas de nacimiento al DataFrame existente y convertir a datetime
-# base_de_datos['fecha_nacimiento'] = fecha_nacimiento['fecha_nacimiento']
-base_de_datos['fecha_nacimiento'] = fecha_nacimiento['fecha_nacimiento']
+# Agregar la columna de fechas de ingeso al DataFrame existente y convertir a datetime
+base_de_datos['fecha_ingreso'] = fecha_ingreso['fecha_ingreso']
 
 # Ahora tenemos la base de datos generada, podemos guardarla como CSV
-base_de_datos.to_csv('BD_BrokenIA_cumpleanos.csv', index=False)
+base_de_datos.to_csv('BD_BrokenIA_ingresos.csv', index=False)
 
 # %%
 base_de_datos.sample(10)
@@ -82,99 +93,162 @@ base_de_datos.sample(10)
 base_de_datos.dtypes
 
 # %% [markdown]
-# ## Etapa 3: leer la lista de nombres, correos y fechas del CSV y generar html de felicitación
+# ## Etapa 3: leer la lista de nombres, correos y fechas del CSV y generar PDF de acuerdo de confidencialidad
 
 # %%
-# Configuración de la conexión SMTP
-smtp_server = 'smtp.gmail.com'
-smtp_port = 587
-smtp_user = 'nataliahoyos@gmail.com' 
-smtp_password = 'iqpb razm awxa taqo'
+# Función para generar el acuerdo de confidencialidad en PDF
+def generate_confidentiality_agreement(nombre, fecha):
+    # Crear un documento PDF
+    doc = SimpleDocTemplate(f"{nombre}_acuerdo_confidencialidad.pdf", pagesize=letter)
+    # Estilo para el título
+    estilo_titulo = ParagraphStyle(name='TitleStyle', fontSize=18, alignment=1, spaceAfter=12, leading=20)
+    # Estilo para el cuerpo del acuerdo
+    estilo_cuerpo = ParagraphStyle(name='CuerpoStyle', fontSize=14, alignment=4, spaceAfter=12)
+    # Contenido del acuerdo
+    contenido = []
 
-# Dirección de correo de destino fija
-correo_destino = 'nataliahoyos@gmail.com'
+    # Título centrado en el PDF
+    titulo = Paragraph("ACUERDO DE CONFIDENCIALIDAD RECÍPROCO SUSCRITO ENTRE BROKEN IA Y EL EMPLEADO", estilo_titulo)
+    contenido.append(titulo)
 
-# Leer el archivo CSV
-fechas_cumpleanos = pd.read_csv('BD_BrokenIA_cumpleanos.csv', parse_dates=['fecha_nacimiento'], date_parser=lambda x: datetime.strptime(x, '%Y-%m-%d'))
+    # Logo de la empresa en la esquina superior izquierda
+    logo_path = './logo_BrokenIA_fondo_blanco.png'
+    logo = Image(logo_path, width=3*cm, height=3*cm)
+    contenido.append(logo)
 
-# Obtener la fecha actual
-hoy = datetime.now()
+    # Párrafos del acuerdo
+    parrafos = [
+        f"Yo {nombre} obrando en mi calidad de empleado de hoy terminóme comprometo a mantener la integridad, reserva y confidencialidad de la información de los Sistemas de Información suministrados con ocasión del desarrollo de las tareas laborales.",
+        f"Con la firma del presente documento, me comprometo a abstenerme de revelar la información confidencial de la que tenga conocimiento, siendo consciente de las penas, multas y sanciones derivadas del incumplimiento, al igual de las demás acciones que puedan llegar a derivarse de éste y del Acuerdo de Confidencialidad Recíproco suscrito entre BROKEN IA y {nombre}.",
+        "Por lo tanto, me hago responsable de seguir las políticas de seguridad y procedimientos para el uso de acceso a la información, evitando cualquier práctica o uso inapropiado que pudiera poner en peligro la información, integridad y reputación de los Sistemas de Información de BROKEN IA.",
+        f"En señal de expresa conformidad y aceptación de los términos recogidos en el presente compromiso se firma en México, a los {fecha}."
+    ]
 
-# Cargar el contenido HTML de la felicitación
-with open('template_tarjeta_felicitacion.html', 'r') as html_file:
-    contenido_html = html_file.read()
+    for parrafo in parrafos:
+        contenido.append(Paragraph(parrafo, estilo_cuerpo))
+        contenido.append(Spacer(1, 14))  # Espacio entre párrafos
 
-# Bucle for para enviar correos electrónicos
-for index, row in fechas_cumpleanos.iterrows():
-    nombre = row['nombre']
-    fecha_nacimiento = row['fecha_nacimiento']
+    # Espacio entre el cuerpo y las firmas
+    contenido.append(Spacer(1, 30))
 
-    # Obtén el nombre de la persona desde el CSV
-    nombre_persona = row['nombre'] 
+    # Información de Nombre y Firma
+    contenido.append(Paragraph(f"Nombre: {nombre}", estilo_cuerpo))
+    contenido.append(Paragraph("Firma: _______________________________", estilo_cuerpo))
 
-    # Obtener el mes y el día de la fecha de nacimiento
-    mes_nacimiento = fecha_nacimiento.month
-    dia_nacimiento = fecha_nacimiento.day
-    
-    # Comparar la fecha actual con la fecha de nacimiento
-    if hoy.month == mes_nacimiento and hoy.day == dia_nacimiento:
-        # Crear un mensaje de correo electrónico personalizado
-        email_message = EmailMessage()
+    # Espacio entre las firmas y la fecha
+    contenido.append(Spacer(1, 30))
 
-        # Realizar el reemplazo del marcador de posición con el nombre de la persona dentro del bucle
-        contenido_html_personalizado = contenido_html.replace('{nombre}', nombre_persona)
+    # Fecha actual
+    fecha_actual = fecha.strftime("%d/%m/%Y")
+    contenido.append(Paragraph(f"Fecha de firma: {fecha_actual}", estilo_cuerpo))
 
-        email_message.set_content(f'¡Feliz cumpleaños, {nombre}!')
+    # Generar el PDF
+    doc.build(contenido)
 
-        email_message['From'] = smtp_user
-        email_message['To'] = correo_destino
-        email_message['Subject'] = f'¡Feliz cumpleaños, {nombre}!'
+# Función para enviar correos electrónicos
+def send_email(to_email, subject, message, filename):
+    smtp_server = 'smtp.gmail.com'
+    smtp_port = 587
+    smtp_user = 'nataliahoyos@gmail.com' 
+    smtp_password = 'iqpb razm awxa taqo'
 
-        # Agregar el contenido HTML personalizado al mensaje
-        email_message.add_alternative(contenido_html_personalizado, subtype='html')
+    # Dirección de correo de destino fija
+    correo_destino = 'nataliahoyos@gmail.com'
 
-        # Conectar y autenticar con el servidor SMTP
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()  # Habilitar TLS si es necesario
-            server.login(smtp_user, smtp_password)
-            server.send_message(email_message)
+    email_message = MIMEMultipart()
+    email_message['From'] = smtp_user
+    email_message['To'] = correo_destino
+    email_message['Subject'] = f'Contrato de confidencialidad'
 
-        print(f'Correo enviado a {correo_destino} para {nombre}')
+    email_message.attach(MIMEText('Te hacemos llegar el nuevo contrato de confidencialidad para que por favor lo regreses firmado, ¡feliz día!', 'plain'))
+
+    with open(filename, 'rb') as pdf_file:
+        pdf_attach = MIMEApplication(pdf_file.read(), _subtype="pdf")
+        pdf_attach.add_header('Content-Disposition', f'attachment; filename={filename}')
+        email_message.attach(pdf_attach)
+
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_user, correo_destino, email_message.as_string())
+
+# Leer la base de datos desde el archivo CSV
+base_datos_ingresos = pd.read_csv("BD_BrokenIA_ingresos.csv")
+
+# Calcular la fecha actual
+fecha_actual = datetime.now()
+
+# Iterar a través de los empleados
+for index, row in base_datos_ingresos.iterrows():
+    fecha_ingreso = datetime.strptime(row['fecha_ingreso'], '%Y-%m-%d')  # Asumiendo un formato de fecha adecuado
+
+    # Calcular la diferencia de días desde la fecha de ingreso
+    dias_transcurridos = (fecha_actual - fecha_ingreso).days
+
+    # Verificar si han pasado 180 días (o múltiplos) desde la fecha de ingreso
+    if dias_transcurridos % 180 == 0:
+        nombre_empleado = row['nombre']
+        email = row['email']
+        mensaje = row['mensaje']
+
+        # Generar el acuerdo de confidencialidad en PDF
+        generate_confidentiality_agreement(nombre_empleado, fecha_actual)
+
+        # Enviar el correo electrónico con el contrato adjunto
+        send_email(email, "Acuerdo de Confidencialidad", mensaje, f"{nombre_empleado}_acuerdo_confidencialidad.pdf")
+
+        print(f"Acuerdo de confidencialidad generado y correo enviado a {nombre_empleado}")
 
 
 # %% [markdown]
-# ## Etapa 4: Acerca del funcionamiento del código principal: envío de tarjeta de felicitación
+# ## Etapa 4: Acerca del funcionamiento del código principal: envío de acuerdo de confidencialidad
 
 # %% [markdown]
-# El código anterior tiene como objetivo enviar correos electrónicos con una felicitación de cumpleaños partir de un archivo CSV y un template en HTML con los siguientes componentes:
+# El código anterior  es una implementación de generación de acuerdos de confidencialidad en formato PDF y su envío por correo electrónico a los empleados de la empresa "BROKEN IA" cuyos contratos cumplen 180 días o múltiplos de 180 días:
 # 
-# 1. **Configuración de la conexión SMTP**: Aquí se definen las configuraciones necesarias para establecer la conexión con el servidor SMTP. Estos valores son específicos de tu proveedor de correo. En este caso, se configura para Gmail.
+# 1. **`generate_confidentiality_agreement` Function**:
+#    Esta función se encarga de crear un acuerdo de confidencialidad en formato PDF para un empleado específico. Aquí están los detalles:
 # 
-#     - `smtp_server`: La dirección del servidor SMTP de Gmail.
-#     - `smtp_port`: El puerto utilizado para la conexión al servidor SMTP de Gmail.
-#     - `smtp_user`: Tu dirección de correo electrónico desde la cual se enviarán los mensajes.
-#     - `smtp_password`: La contraseña de tu cuenta de correo.
+#    - **Creación de PDF**: La función crea un documento PDF con el nombre del empleado y un título centrado que describe el acuerdo de confidencialidad.
 # 
-# 2. **Dirección de correo de destino fija**: Esto establece la dirección de correo de destino, que en este caso se mantiene fija como `'nataliahoyos@gmail.com'`. Sin embargo, esto podría cambiarse para enviar correos a diferentes destinatarios.
+#    - **Estilos de Texto**: Define dos estilos de texto: uno para el título (`estilo_titulo`) y otro para el cuerpo del acuerdo (`estilo_cuerpo`). Estos estilos especifican el tamaño de fuente, alineación, espacio después del párrafo y el interlineado.
 # 
-# 3. **Leer el archivo CSV**: Aquí se lee el archivo CSV llamado `'BD_BrokenIA_cumpleanos.csv'` utilizando pandas. Se utiliza `parse_dates` para convertir la columna 'fecha_nacimiento' en objetos de fecha y hora. También se especifica un `date_parser` para analizar las fechas en el formato correcto.
+#    - **Contenido del PDF**:
+#      - Agrega el título centrado en el PDF.
+#      - Inserta el logotipo de la empresa en la esquina superior izquierda del PDF.
+#      - Define una serie de párrafos que componen el contenido del acuerdo, incluyendo el nombre del empleado y los detalles del compromiso de confidencialidad.
+#      - Agrega cada párrafo al contenido del PDF con espacio adicional entre ellos para mejorar la legibilidad.
+#      - Inserta información sobre el nombre y la firma del empleado.
+#      - Agrega la fecha actual en el formato día/mes/año, como se especificó.
 # 
-# 4. **Obtener la fecha actual**: Se utiliza `datetime.now()` para obtener la fecha y hora actual.
+#    - **Generación del PDF**: Finalmente, la función genera el PDF con todo el contenido definido y lo guarda con el nombre del empleado.
 # 
-# 5. **Cargar el contenido HTML de la felicitación**: Abre y lee el contenido del archivo HTML de la tarjeta de felicitación desde `'template_tarjeta_felicitacion.html'`. El contenido se almacena en la variable `contenido_html`.
+# 2. **`send_email` Function**:
+#    Esta función se encarga de enviar un correo electrónico que incluye el acuerdo de confidencialidad como archivo adjunto. Aquí están los detalles:
 # 
-# 6. **Obtener el nombre de la persona desde el CSV**: Esto es donde ocurre un error en el código original. El intento de obtener el nombre de la persona está fuera del bucle `for`. La variable `row` no está definida en este punto y, por lo tanto, no se puede acceder al nombre de la persona en este lugar. Esto debería estar dentro del bucle `for` para obtener el nombre de cada persona desde el archivo CSV en cada iteración.
+#    - **Configuración del Servidor SMTP**: Se establecen las configuraciones del servidor SMTP para enviar correos electrónicos. Esto incluye el servidor SMTP (Gmail en este caso), el puerto y las credenciales de inicio de sesión.
 # 
-# 7. **Reemplazar el marcador de posición con el nombre de la persona**: Aquí, se reemplaza el marcador de posición `{nombre}` en el contenido HTML con el nombre de la persona. Sin embargo, esto debería realizarse dentro del bucle `for` para cada persona individualmente, pero en el código proporcionado, se hace fuera del bucle, por lo que solo se toma el nombre de una persona (la última en el archivo CSV).
+#    - **Creación del Correo Electrónico**: La función crea un correo electrónico utilizando la biblioteca `email.mime`. Se establece el remitente, el destinatario, el asunto del correo electrónico y un mensaje de texto plano.
 # 
-# 8. **Guardar los cambios en el archivo HTML**: Después de reemplazar el marcador de posición por el nombre de la persona, el contenido HTML se guarda en un nuevo archivo llamado `'tarjeta_felicitacion.html'`. Este paso no es necesario para enviar correos electrónicos, ya que solo estás guardando el contenido HTML en un archivo.
+#    - **Archivo Adjunto**: Se adjunta el acuerdo de confidencialidad (PDF) al correo electrónico. El archivo se carga desde el sistema de archivos y se adjunta al mensaje de correo electrónico.
 # 
-# 9. **Bucle `for` para enviar correos electrónicos**: Este bucle `for` itera a través de las filas del DataFrame `fechas_cumpleanos`, que contiene la información de las personas cuyo cumpleaños se celebra. Para cada persona, se verifica si la fecha de nacimiento coincide con la fecha actual.
+#    - **Envío del Correo Electrónico**: La función inicia una conexión con el servidor SMTP, inicia una sesión segura y envía el correo electrónico a la dirección de destino.
 # 
-# 10. **Crear un mensaje de correo electrónico personalizado**: Si la fecha de cumpleaños coincide, se crea un mensaje de correo electrónico personalizado utilizando la biblioteca `EmailMessage`. El contenido del correo electrónico se establece con un saludo de cumpleaños y se especifica la dirección del remitente y del destinatario.
+# 3. **Main Loop**:
+#    En el bucle principal, el código realiza las siguientes acciones:
 # 
-# 11. **Agregar el contenido HTML al mensaje**: Aquí es donde se adjunta el contenido HTML de la tarjeta de felicitación al mensaje de correo electrónico. Sin embargo, dado que se ha reemplazado el marcador de posición por el nombre de la persona fuera del bucle, el nombre en el correo electrónico será el mismo para todos los destinatarios.
+#    - Lee una base de datos de empleados desde un archivo CSV llamado "BD_BrokenIA_ingresos.csv" y la almacena en un DataFrame de pandas llamado `base_datos_ingresos`.
 # 
-# 12. **Conectar y enviar el correo electrónico**: Finalmente, se establece una conexión con el servidor SMTP de Gmail, se inicia la sesión, y se envía el correo electrónico a la dirección de correo de destino. Luego, se muestra un mensaje indicando que se ha enviado el correo.
+#    - Calcula la fecha actual utilizando la función `datetime.now()`.
+# 
+#    - Itera a través de cada fila (empleado) en el DataFrame `base_datos_ingresos`.
+# 
+#    - Calcula la diferencia en días entre la fecha de ingreso del empleado y la fecha actual.
+# 
+#    - Verifica si han pasado 180 días o un múltiplo de 180 días desde la fecha de ingreso. Si es así, genera un acuerdo de confidencialidad en PDF y lo envía al empleado por correo electrónico.
+# 
+#    - El acuerdo de confidencialidad se genera utilizando la función `generate_confidentiality_agreement`, y se envía por correo electrónico utilizando la función `send_email`. El correo electrónico contiene un mensaje fijo y el acuerdo de confidencialidad como archivo adjunto.
+# 
+#    - Se muestra un mensaje en la consola indicando que el acuerdo de confidencialidad ha sido generado y enviado al empleado correspondiente.
 
 
